@@ -1,0 +1,95 @@
+---
+title: "Practical Machine Learning - Course Project"
+author: "Neel Vashisht"
+date: "24/10/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Overview
+
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. Fortunately, the enthusiasts of tech world and fitness, love tracking and quantifying their physical activities, be it running, workouts, swimming, etc. But the quality of those workouts does not get measured. In this project, we will attempt to measure the quality of the activities performed.
+
+```{r, cache=TRUE}
+library(caret)
+library(rattle)
+library(rpart)
+library(rpart.plot)
+```
+
+### Getting data
+For data we're using the data set provided in http://web.archive.org/web/20161224072740/http:/groupware.les.inf.puc-rio.br/har. A very well written article now residing in web archive.
+
+```{r, cache=TRUE}
+trainSet <- read.csv("~/R/pml-training.csv")
+testSet <- read.csv("~/R/pml-testing.csv")
+dim(trainSet)
+dim(testSet)
+```
+
+The data set contains a lot of variables (160) which we don't need.
+
+## Cleaning data
+To remove the variables we don't need, we'll use 
+```{r, cache=TRUE}
+removeCol <- which(colSums(is.na(trainSet) | trainSet=="") > 0.9 * dim(trainSet)[1]) 
+trainSetClean <- trainSet[,-removeCol]
+trainSetClean <- trainSetClean[,-c(1:7)]
+dim(trainSetClean)
+```
+```{r, CACHE=TRUE}
+# test set
+removeCol <- which(colSums(is.na(testSet) | testSet=="") > 0.9 * dim(testSet)[1]) 
+testSetClean <- testSet[,-removeCol]
+testSetClean <- testSetClean[,-1]
+dim(testSetClean)
+```
+
+### Training and testing
+We now cleaned training set into a pure training data set (75%) and a validation data set (25%). The 25% will be used for validation at the end of training the model.
+
+```{r, cache.lazy=TRUE}
+set.seed(12345)
+intrainData <- createDataPartition(trainSetClean$classe, p=0.75, list=FALSE)
+trainData <- trainSetClean[intrainData,]
+testData <- trainSetClean[-intrainData,]
+dim(trainData)
+```
+
+## Data Modeling
+For data modeling, we use random forest for easier sailing, using three fold cross validation method.
+```{r, cache=TRUE}
+controlRF <- trainControl(method="cv", number=3)
+#model_CT <- train(classe~., data=trainData, method="rpart", trControl=trControl)
+modelRF <- train(classe~., data=trainData, method="rf", trControl=controlRF, verbose=FALSE)
+```
+
+## Decision Tree
+
+The decision formed will look like this:
+```{r, cache=TRUE}
+tree <- rpart(classe ~ ., data=trainData, method="class")
+prp(tree)
+```
+
+## Testing the model
+For testing we'll use the 25% unused data from the original training set.
+```{r, cache=TRUE}
+trainpred <- predict(modelRF,newdata=testData)
+
+cmat <- confusionMatrix(testData$classe,trainpred)
+
+# model accuracy
+cmat$overall[1]
+```
+The accuracy comes out fairly good.
+
+## End Result
+For the last, we use the actual tests to test out the model developed in the report.
+```{r, cache=TRUE}
+FinalTestPred <- predict(modelRF,newdata=testSetClean)
+FinalTestPred
+```
